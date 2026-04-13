@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "retina-custody"
+version = "0.1.0"
+description = "Cryptographic chain-of-custody for RETINA passive radar detection data"
+requires-python = ">=3.10"
+dependencies = [
+    "cryptography>=46.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["retina_custody*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
