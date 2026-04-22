@@ -4,7 +4,6 @@ Data models for chain of custody system.
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field, asdict
 from typing import Optional
 

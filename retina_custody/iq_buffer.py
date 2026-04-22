@@ -21,7 +21,6 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
-import struct
 import time
 import threading
 import uuid
@@ -159,7 +158,6 @@ class IQCaptureManager:
             tsa_token = self.tsa.request_timestamp(iq_hash)
 
         # 5. Config hash
-        import json
         from .packet_signer import canonicalize
         config_hash = self.crypto.hash_sha256(canonicalize(self.node_config))
 

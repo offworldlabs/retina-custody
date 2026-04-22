@@ -1,7 +1,6 @@
 """Unit tests for Chain of Custody subsystem."""
 
 import copy
-import json
 import os
 
 import pytest

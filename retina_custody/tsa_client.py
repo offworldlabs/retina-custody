@@ -12,11 +12,9 @@ Two independent timestamping systems:
 from __future__ import annotations
 
 import base64
-import hashlib
 import logging
 import os
 import struct
-import time
 from typing import Optional
 
 logger = logging.getLogger(__name__)
