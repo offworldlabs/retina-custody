@@ -4,8 +4,7 @@ Data models for chain of custody system.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
-from typing import Optional
+from dataclasses import asdict, dataclass, field
 
 
 @dataclass
@@ -21,7 +20,7 @@ class SignedPacket:
     delay: list[float] = field(default_factory=list)
     doppler: list[float] = field(default_factory=list)
     snr: list[float] = field(default_factory=list)
-    adsb: Optional[list] = None
+    adsb: list | None = None
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -48,8 +47,8 @@ class HashChainEntry:
     entry_hash: str            # SHA-256 of canonical JSON of this entry (excluding signature fields)
     signature: str             # hex-encoded ECDSA signature of entry_hash
     signing_mode: str          # "hardware" or "software"
-    tsa_token: Optional[str] = None   # base64-encoded RFC 3161 TSA response
-    ots_proof: Optional[str] = None   # base64-encoded OpenTimestamps proof
+    tsa_token: str | None = None   # base64-encoded RFC 3161 TSA response
+    ots_proof: str | None = None   # base64-encoded OpenTimestamps proof
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -71,7 +70,7 @@ class IQCapturePackage:
     iq_hash: str               # SHA-256 of raw IQ data
     signature: str             # ECDSA signature of iq_hash
     signing_mode: str
-    tsa_token: Optional[str] = None
+    tsa_token: str | None = None
     node_config_hash: str = ""
     trigger_reason: str = ""   # e.g. "anomalous_detection"
     iq_size_bytes: int = 0

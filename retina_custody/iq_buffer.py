@@ -21,11 +21,10 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
-import time
 import threading
+import time
 import uuid
 from collections import deque
-from typing import Optional
 
 from .crypto_backend import CryptoBackend
 from .models import IQCapturePackage
@@ -54,7 +53,7 @@ class IQCircularBuffer:
         # Deque of (timestamp_ms, chunk_bytes) tuples
         self._buffer: deque[tuple[int, bytes]] = deque()
         self._running = False
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
 
     def start(self):
         """Start the buffer (synthetic: generates placeholder data periodically)."""

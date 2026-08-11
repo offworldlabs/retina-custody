@@ -15,7 +15,6 @@ import base64
 import logging
 import os
 import struct
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +75,7 @@ class TSAClient:
     def __init__(self, url: str = DIGICERT_TSA_URL):
         self.url = url
 
-    def request_timestamp(self, data_hash: str) -> Optional[str]:
+    def request_timestamp(self, data_hash: str) -> str | None:
         """Request a TSA timestamp for a hex hash digest.
 
         Returns base64-encoded TSA response token, or None on failure.
@@ -121,7 +120,7 @@ class OpenTimestampsClient:
     def __init__(self, calendar_urls: list[str] | None = None):
         self.calendar_urls = calendar_urls or OTS_CALENDAR_URLS
 
-    def submit(self, data_hash: str) -> Optional[str]:
+    def submit(self, data_hash: str) -> str | None:
         """Submit a hash to OpenTimestamps calendar servers.
 
         Returns base64-encoded initial timestamp proof, or None on failure.
@@ -170,7 +169,7 @@ class TimestampManager:
         self.tsa = TSAClient() if enable_tsa else None
         self.ots = OpenTimestampsClient() if enable_ots else None
 
-    def timestamp_entry(self, entry_hash: str) -> tuple[Optional[str], Optional[str]]:
+    def timestamp_entry(self, entry_hash: str) -> tuple[str | None, str | None]:
         """Get TSA token and OTS proof for a hash chain entry.
 
         Returns (tsa_token, ots_proof) — either may be None if the
