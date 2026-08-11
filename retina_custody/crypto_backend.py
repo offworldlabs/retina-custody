@@ -17,9 +17,9 @@ import os
 import uuid
 from abc import ABC, abstractmethod
 
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ class SoftwareCryptoBackend(CryptoBackend):
         """Load existing key pair or generate a new one."""
         if os.path.exists(self._key_file):
             try:
-                with open(self._key_file, "r") as f:
+                with open(self._key_file) as f:
                     data = json.load(f)
                 self._private_key = serialization.load_pem_private_key(
                     data["private_key_pem"].encode(), password=None

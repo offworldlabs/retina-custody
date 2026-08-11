@@ -124,10 +124,10 @@ class PacketVerifier:
 
         try:
             sig_bytes = bytes.fromhex(packet.signature)
+            from cryptography.exceptions import InvalidSignature
+            from cryptography.hazmat.primitives import hashes
             from cryptography.hazmat.primitives import serialization as ser
             from cryptography.hazmat.primitives.asymmetric import ec
-            from cryptography.hazmat.primitives import hashes
-            from cryptography.exceptions import InvalidSignature
 
             pub_key = ser.load_pem_public_key(pem.encode())
             # Signature is over the hash string bytes

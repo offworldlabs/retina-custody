@@ -23,11 +23,10 @@ import logging
 import os
 import time
 from datetime import datetime, timezone
-from typing import Optional
 
 from .crypto_backend import CryptoBackend
-from .packet_signer import canonicalize
 from .models import HashChainEntry
+from .packet_signer import canonicalize
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +56,7 @@ class HashChainBuilder:
 
         # Chain state
         self._prev_hash: str = "genesis"
-        self._current_hour: Optional[str] = None
+        self._current_hour: str | None = None
         self._detection_hashes: list[str] = []  # SHA-256 of each signed packet this hour
         self._n_detections: int = 0
         self._chain: list[HashChainEntry] = []
@@ -76,7 +75,7 @@ class HashChainBuilder:
         state_file = os.path.join(self._chain_dir, "chain_state.json")
         if os.path.exists(state_file):
             try:
-                with open(state_file, "r") as f:
+                with open(state_file) as f:
                     state = json.load(f)
                 self._prev_hash = state.get("last_hash", "genesis")
                 self._current_hour = state.get("current_hour")
@@ -96,7 +95,7 @@ class HashChainBuilder:
             json.dump(state, f)
 
     @staticmethod
-    def _hour_key(ts: Optional[float] = None) -> str:
+    def _hour_key(ts: float | None = None) -> str:
         """Get the current UTC hour as ISO string."""
         dt = datetime.fromtimestamp(ts or time.time(), tz=timezone.utc)
         return dt.strftime("%Y-%m-%dT%H:00:00Z")
@@ -117,7 +116,7 @@ class HashChainBuilder:
         self._detection_hashes.append(payload_hash)
         self._n_detections += 1
 
-    def close_hour(self) -> Optional[HashChainEntry]:
+    def close_hour(self) -> HashChainEntry | None:
         """Close the current hour and produce a signed HashChainEntry.
 
         Returns the entry, or None if there were no detections.
@@ -195,7 +194,7 @@ class HashChainBuilder:
         """Return all chain entries built during this session."""
         return list(self._chain)
 
-    def get_latest_entry(self) -> Optional[HashChainEntry]:
+    def get_latest_entry(self) -> HashChainEntry | None:
         """Return the most recent chain entry."""
         return self._chain[-1] if self._chain else None
 
@@ -255,10 +254,10 @@ class HashChainVerifier:
 
         try:
             sig_bytes = bytes.fromhex(entry.signature)
+            from cryptography.exceptions import InvalidSignature
+            from cryptography.hazmat.primitives import hashes
             from cryptography.hazmat.primitives import serialization as ser
             from cryptography.hazmat.primitives.asymmetric import ec
-            from cryptography.hazmat.primitives import hashes
-            from cryptography.exceptions import InvalidSignature
 
             pub_key = ser.load_pem_public_key(pem.encode())
             pub_key.verify(sig_bytes, entry_canonical, ec.ECDSA(hashes.SHA256()))
