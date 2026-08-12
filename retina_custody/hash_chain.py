@@ -62,9 +62,7 @@ class HashChainBuilder:
         self._chain: list[HashChainEntry] = []
 
         # Persistence directory
-        self._chain_dir = chain_dir or os.path.join(
-            os.path.dirname(__file__), "..", "coverage_data", "chains", node_id
-        )
+        self._chain_dir = chain_dir or os.path.join(os.path.dirname(__file__), "..", "coverage_data", "chains", node_id)
         os.makedirs(self._chain_dir, exist_ok=True)
 
         # Try to load previous chain state
@@ -180,7 +178,10 @@ class HashChainBuilder:
 
         logger.info(
             "Chain entry for %s hour=%s: %d detections, hash=%s...",
-            self.node_id, hour_utc, entry.n_detections, entry_hash[:12],
+            self.node_id,
+            hour_utc,
+            entry.n_detections,
+            entry_hash[:12],
         )
         return entry
 
@@ -242,6 +243,7 @@ class HashChainVerifier:
         }
         entry_canonical = canonicalize(entry_data)
         import hashlib
+
         computed_hash = hashlib.sha256(entry_canonical).hexdigest()
 
         if computed_hash != entry.entry_hash:

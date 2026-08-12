@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 # = 2 × 60 × 2e6 × 4 = 960 MB for real data. For synthetic, we use small chunks.
 DEFAULT_BUFFER_DURATION_S = 120
 SYNTHETIC_CHUNK_INTERVAL_S = 1.0  # Generate a synthetic chunk every 1s
-SYNTHETIC_CHUNK_SIZE = 1024       # Small placeholder chunks for testing
+SYNTHETIC_CHUNK_SIZE = 1024  # Small placeholder chunks for testing
 
 
 class IQCircularBuffer:
@@ -158,6 +158,7 @@ class IQCaptureManager:
 
         # 5. Config hash
         from .packet_signer import canonicalize
+
         config_hash = self.crypto.hash_sha256(canonicalize(self.node_config))
 
         capture_id = f"iq-{uuid.uuid4().hex[:12]}"
@@ -179,7 +180,9 @@ class IQCaptureManager:
         self._captures.append(package)
         logger.info(
             "IQ capture %s: %d bytes, hash=%s..., tsa=%s",
-            capture_id, len(iq_data), iq_hash[:12],
+            capture_id,
+            len(iq_data),
+            iq_hash[:12],
             "ok" if tsa_token else "none",
         )
 
