@@ -20,7 +20,7 @@ jobs:
 
       # Pinned deliberately: an unpinned linter picks up new rules on release
       # and turns a green branch red without anything in this repo changing.
-      - run: uv pip install --system -e '.[dev]' pre-commit==4.6.2
+      - run: uv pip install --system -e '.[dev]' pre-commit==4.6.2 vulture==2.14
 
       - run: pre-commit run --all-files --show-diff-on-failure
 
