@@ -82,9 +82,7 @@ class SoftwareCryptoBackend(CryptoBackend):
             try:
                 with open(self._key_file) as f:
                     data = json.load(f)
-                self._private_key = serialization.load_pem_private_key(
-                    data["private_key_pem"].encode(), password=None
-                )
+                self._private_key = serialization.load_pem_private_key(data["private_key_pem"].encode(), password=None)
                 self._public_key = self._private_key.public_key()
                 self._serial = data.get("serial", str(uuid.uuid4()))
                 logger.info("Loaded existing key pair from %s", self._key_file)
@@ -166,8 +164,7 @@ class HardwareCryptoBackend(CryptoBackend):
 
     def __init__(self):
         raise NotImplementedError(
-            "HardwareCryptoBackend requires ATECC608B hardware. "
-            "Use SoftwareCryptoBackend for synthetic/test nodes."
+            "HardwareCryptoBackend requires ATECC608B hardware. Use SoftwareCryptoBackend for synthetic/test nodes."
         )
 
     def get_public_key_pem(self) -> str:
@@ -191,6 +188,7 @@ class HardwareCryptoBackend(CryptoBackend):
 
 
 # ── Server-side verification helper ──────────────────────────────────────────
+
 
 class SignatureVerifier:
     """Server-side signature verification using registered public keys.

@@ -116,6 +116,7 @@ class PacketVerifier:
 
         canonical = canonicalize(payload)
         import hashlib as _hl
+
         computed_hash = _hl.sha256(canonical).hexdigest()
 
         if computed_hash != packet.payload_hash:
