@@ -4,50 +4,24 @@ Data models for chain of custody system.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
-
-
-@dataclass
-class SignedPacket:
-    """A detection frame wrapped with cryptographic signature."""
-
-    node_id: str
-    timestamp_ms: int
-    payload_hash: str  # SHA-256 of canonical JSON payload
-    signature: str  # hex-encoded ECDSA signature
-    signing_mode: str  # "hardware" or "software"
-    public_key_fingerprint: str  # SHA-256 of DER-encoded public key (first 16 hex chars)
-    # Original detection data
-    delay: list[float] = field(default_factory=list)
-    doppler: list[float] = field(default_factory=list)
-    snr: list[float] = field(default_factory=list)
-    adsb: list | None = None
-
-    def to_dict(self) -> dict:
-        d = asdict(self)
-        if d["adsb"] is None:
-            del d["adsb"]
-        return d
-
-    @staticmethod
-    def from_dict(d: dict) -> SignedPacket:
-        return SignedPacket(**{k: v for k, v in d.items() if k in SignedPacket.__dataclass_fields__})
+from dataclasses import asdict, dataclass
 
 
 @dataclass
 class HashChainEntry:
-    """One link in the hourly hash chain."""
+    """One link in the hash chain, covering one time window of detections."""
 
     node_id: str
-    hour_utc: str  # e.g. "2026-03-19T14:00:00Z"
+    window_start: str  # ISO 8601 UTC, inclusive, e.g. "2026-03-19T14:00:00Z"
+    window_end: str  # ISO 8601 UTC, exclusive, e.g. "2026-03-19T14:15:00Z"
     prev_hash: str  # SHA-256 of the previous entry (or "genesis" for first)
-    detections_hash: str  # SHA-256 of all detections in this hour
+    detections_hash: str  # SHA-256 of the canonical JSON array of this window's frames
     n_detections: int
-    node_config_hash: str  # SHA-256 of node config at this hour
+    node_config_hash: str  # SHA-256 of node config at window close
     firmware_version: str
     timestamp_utc: str  # ISO 8601 creation timestamp
     entry_hash: str  # SHA-256 of canonical JSON of this entry (excluding signature fields)
-    signature: str  # hex-encoded ECDSA signature of entry_hash
+    signature: str  # hex-encoded ECDSA signature over the canonical JSON of the hashed fields
     signing_mode: str  # "hardware" or "software"
     tsa_token: str | None = None  # base64-encoded RFC 3161 TSA response
     ots_proof: str | None = None  # base64-encoded OpenTimestamps proof
