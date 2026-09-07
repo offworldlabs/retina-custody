@@ -2,7 +2,7 @@
 TSA (Timestamping Authority) and OpenTimestamps integration.
 
 Node-direct timestamping — removes Offworld Labs from the trust path.
-Each node makes its own requests: one per hour per node.
+Each node makes its own requests: one per chain window per node.
 
 Two independent timestamping systems:
 1. DigiCert TSA: RFC 3161 timestamps (fast, legally recognized)
@@ -161,8 +161,7 @@ class OpenTimestampsClient:
 class TimestampManager:
     """Manages both TSA and OTS timestamping for hash chain entries.
 
-    Used by nodes to timestamp their hourly chain entries.
-    Rate: one request per hour per node — well within free tier limits.
+    Used by nodes to timestamp their chain entries, once per window.
     """
 
     def __init__(self, enable_tsa: bool = True, enable_ots: bool = True):

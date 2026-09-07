@@ -26,6 +26,7 @@ import time
 import uuid
 from collections import deque
 
+from .canonical import canonicalize
 from .crypto_backend import CryptoBackend
 from .models import IQCapturePackage
 from .tsa_client import TSAClient
@@ -157,8 +158,6 @@ class IQCaptureManager:
             tsa_token = self.tsa.request_timestamp(iq_hash)
 
         # 5. Config hash
-        from .packet_signer import canonicalize
-
         config_hash = self.crypto.hash_sha256(canonicalize(self.node_config))
 
         capture_id = f"iq-{uuid.uuid4().hex[:12]}"
