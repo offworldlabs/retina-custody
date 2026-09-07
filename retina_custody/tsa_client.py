@@ -65,6 +65,48 @@ def _build_tsa_request(digest: bytes) -> bytes:
     return tsq
 
 
+def _read_tlv(buf: bytes, pos: int) -> tuple[int, bytes, int]:
+    """Read one DER tag-length-value at `pos`. Returns (tag, value, next_pos)."""
+    tag = buf[pos]
+    length = buf[pos + 1]
+    pos += 2
+    if length & 0x80:
+        n = length & 0x7F
+        length = int.from_bytes(buf[pos : pos + n], "big")
+        pos += n
+    return tag, buf[pos : pos + length], pos + length
+
+
+# PKIStatus values (RFC 3161 §2.4.2) that mean a token was issued.
+_TSA_STATUS_GRANTED = {0, 1}  # granted, grantedWithMods
+
+
+def _tsa_response_ok(tsr: bytes) -> tuple[bool, str]:
+    """Check a TimeStampResp carries a granted status and a token.
+
+    TimeStampResp ::= SEQUENCE { status PKIStatusInfo, timeStampToken OPTIONAL }
+    PKIStatusInfo ::= SEQUENCE { status INTEGER, ... }
+    """
+    try:
+        tag, body, _ = _read_tlv(tsr, 0)
+        if tag != 0x30:
+            return False, "not an ASN.1 SEQUENCE"
+        tag, status_info, token_pos = _read_tlv(body, 0)
+        if tag != 0x30:
+            return False, "malformed PKIStatusInfo"
+        tag, status_val, _ = _read_tlv(status_info, 0)
+        if tag != 0x02:
+            return False, "malformed PKIStatus"
+        status = int.from_bytes(status_val, "big", signed=True)
+    except (IndexError, ValueError):
+        return False, "truncated response"
+    if status not in _TSA_STATUS_GRANTED:
+        return False, f"PKIStatus {status}"
+    if token_pos >= len(body):
+        return False, "granted but no timeStampToken"
+    return True, "ok"
+
+
 class TSAClient:
     """Client for RFC 3161 timestamp requests to DigiCert TSA.
 
@@ -96,14 +138,12 @@ class TSAClient:
             resp = urllib.request.urlopen(req, timeout=15)
             tsr = resp.read()
 
-            # Basic validation: response should start with ASN.1 SEQUENCE
-            if tsr and tsr[0] == 0x30:
-                token = base64.b64encode(tsr).decode("ascii")
-                logger.debug("TSA token received (%d bytes)", len(tsr))
-                return token
-            else:
-                logger.warning("TSA response invalid (not ASN.1 SEQUENCE)")
+            ok, reason = _tsa_response_ok(tsr)
+            if not ok:
+                logger.warning("TSA response rejected: %s", reason)
                 return None
+            logger.debug("TSA token received (%d bytes)", len(tsr))
+            return base64.b64encode(tsr).decode("ascii")
 
         except Exception as exc:
             logger.warning("TSA request failed: %s", exc)
