@@ -5,7 +5,7 @@ Cryptographic chain of custody for RETINA passive radar detection data.
 `retina_custody` is a small, dependency-light Python library (`cryptography` is the
 only runtime dependency) that a RETINA node embeds to make its detection output
 tamper-evident, and that an archive uses to verify what it receives. It was
-extracted from the Tower-Finder backend and is published as a standalone package.
+extracted from the Tower-Finder backend and packaged on its own.
 
 The design has three parts:
 
@@ -28,9 +28,9 @@ uploading the `(entry, batch)` pairs it returns, and storing node public keys.
 
 ## Architecture
 
-The diagram shows the package as it exists today. Solid boxes are implemented
-and tested. Dashed boxes are either placeholders or are implemented but not yet
-wired into any caller.
+The diagram shows the package as it exists today. Solid boxes inside
+`retina_custody` are implemented and tested. Dashed boxes are either placeholders
+or are implemented but not yet wired into any caller.
 
 ```mermaid
 flowchart TB
@@ -70,7 +70,7 @@ flowchart TB
 
     subgraph archive["Archive (outside this package)"]
         verifier["hash_chain.HashChainVerifier"]
-        keys["Node public keys<br/>(NodeIdentity)"]
+        keys["Node public keys<br/>node_id → PEM lookup"]
         store["Stored entries + batches"]
     end
 
@@ -140,14 +140,16 @@ Closing is time-driven and windows only ever close forward.
 - `add_detection(frame)` records a frame in the open window. If the frame arrives
   after the window boundary, the stale window is closed first and its
   `(entry, batch)` is returned so the host can upload it. Frames that are not JSON
-  serialisable are rejected before anything is recorded.
+  serialisable raise `TypeError` or `ValueError` before anything is recorded.
 - `close_if_due()` should be called from a periodic timer. A quiet window still
   closes on the boundary and produces an entry with zero detections.
 - `close_window()` closes the open window regardless of the clock. Use it at
-  shutdown so pending frames are committed.
+  shutdown so pending frames are committed. It returns `None` if no window is
+  open.
 - A clock step backwards does not reopen an earlier window. A jump forward by
   more than one window closes only the open window, and the gap is visible in the
-  archive as a `window_start` that does not equal the previous `window_end`.
+  archive as a `window_start` that does not equal the previous `window_end`. The
+  verifier does not check window continuity; the archive must do that itself.
 
 ### Persistence and recovery
 
@@ -159,14 +161,20 @@ Only two files are written, once per window, under `chain_dir`:
   replaced after the log append.
 
 The entry is persisted before in-memory state advances. If the write fails the
-frames stay pending and the window stays open, so the next close retries. On
-restart the builder resumes `prev_hash` from the last complete line of the log,
-falling back to the state file. A partial trailing log line from a power loss
-mid-append is ignored.
+exception propagates out of the closing call, the frames stay pending and the
+window stays open, so the next close retries. The host should catch and log it.
+On restart the builder resumes `prev_hash` from the last complete line of the
+log, falling back to the state file. A partial trailing log line from a power
+loss mid-append is ignored.
 
-Pending frames live only in RAM until the window closes. If `chain_dir` is not
-given, the default is `coverage_data/chains/<node_id>` relative to the package's
-parent directory.
+Pending frames live only in RAM until the window closes. Window close, including
+any timestamp requests, runs synchronously under the builder's lock, so with
+live timestamp services a close can block `add_detection()` for the duration of
+those requests.
+
+If `chain_dir` is not given, the default is `coverage_data/chains/<node_id>`
+relative to the package's parent directory, which is inside `site-packages` for
+an installed package. Always pass `chain_dir` explicitly.
 
 ### Verification
 
@@ -180,9 +188,10 @@ returns a node's PEM public key, `verify_entry()` checks, in order:
    it is a JSON list of length `n_detections`.
 
 `verify_chain()` walks a list of entries, threading each `entry_hash` into the
-next entry's expected `prev_hash`, and returns every issue found. TSA tokens and
-OpenTimestamps proofs are carried on the entry but are not validated by this
-package.
+next entry's expected `prev_hash`, and returns every issue found. The first
+entry's `prev_hash` is not checked, so a chain can be verified from any starting
+point. TSA tokens and OpenTimestamps proofs are carried on the entry but are not
+validated by this package.
 
 ### Timestamping
 
@@ -204,9 +213,9 @@ Requests are made directly from the node with a 15 second timeout.
 ### IQ capture
 
 `IQCircularBuffer` holds `(timestamp_ms, chunk)` tuples in a deque and evicts
-anything older than its duration (120 s by default). In synthetic mode it fills
-itself with 1 KiB random chunks once per second for protocol testing. Nothing is
-written to disk.
+anything older than its duration (120 s by default). In synthetic mode,
+`start()` launches a thread that appends 1 KiB random chunks once per second for
+protocol testing. Nothing is written to disk.
 
 `IQCaptureManager.capture(window_start_ms, window_end_ms)` freezes the buffer for
 the window, hashes the bytes, signs them, requests a TSA timestamp for the hash,
@@ -238,11 +247,16 @@ closed = builder.add_detection({"t": 1.0, "range_m": 1200.0, "doppler_hz": -43.5
 closed = builder.close_if_due()
 
 # At shutdown, commit whatever is pending.
-entry, batch = builder.close_window()
+closed = builder.close_window()
+if closed is not None:
+    entry, batch = closed
 ```
 
 Whenever a call returns a non-`None` `(entry, batch)`, upload both together.
 `entry.to_dict()` gives a JSON-ready dict with `None` fields removed.
+`HashChainBuilder` also accepts `window_s` (seconds, default 900),
+`firmware_version`, and `clock` (a callable returning epoch seconds, used by the
+tests to drive window boundaries).
 
 Archive side:
 
@@ -259,6 +273,11 @@ ok, issues = verifier.verify_chain([entry], [batch])    # (True, [])
 Pass `timestamper=TimestampManager()` to enable live DigiCert and OpenTimestamps
 requests, or omit it to leave `tsa_token` and `ots_proof` unset.
 
+`SoftwareCryptoBackend` generates a P-256 key pair on first use and stores it in
+`key_file`. If that file exists but cannot be parsed, it logs a warning and
+generates a new key pair, which changes the node's identity. Each node must have
+its own key file.
+
 ## Modules
 
 | Module | Contents |
@@ -272,7 +291,7 @@ requests, or omit it to leave `tsa_token` and `ots_proof` unset.
 
 Public exports from `retina_custody`: `CryptoBackend`, `SoftwareCryptoBackend`,
 `HashChainBuilder`, `HashChainVerifier`, `HashChainEntry`, `TimestampManager`,
-`canonicalize`.
+`canonicalize`. Everything else is imported from its submodule.
 
 ## Status
 
@@ -283,8 +302,11 @@ Public exports from `retina_custody`: `CryptoBackend`, `SoftwareCryptoBackend`,
   behaviour (I2C at 0x6A, on-chip key generation and P-256 signing) and raises
   `NotImplementedError`. It will be filled in when Raspberry Pi nodes are deployed.
 - `IQCircularBuffer` and `IQCaptureManager` are implemented but have no caller
-  yet, inside or outside this package, and have no tests. They are tracked in
-  `vulture_whitelist.py` under UNREVIEWED.
+  yet, inside or outside this package, and have no tests.
+- The UNREVIEWED section of `vulture_whitelist.py` lists `HardwareCryptoBackend`,
+  `IQCaptureManager` and its `capture` and `captures`, `IQCircularBuffer.stop`,
+  and three model fields with no reader (`IQCapturePackage.iq_size_bytes`,
+  `NodeIdentity.public_key_fingerprint`, `NodeIdentity.registered_at`).
 - The live TSA and OpenTimestamps endpoints are not reachable from CI; the
   clients are tested against a local mock HTTP server.
 
@@ -304,4 +326,6 @@ pip install pre-commit==4.6.2 vulture==2.14
 pre-commit run --all-files
 ```
 
-CI runs the same two commands on every pull request and push to `main`.
+CI (`.github/workflows/ci.yml`) installs the package with `uv` on Python 3.12
+and runs `pre-commit run --all-files` and `pytest` on every pull request and push
+to `main`.
