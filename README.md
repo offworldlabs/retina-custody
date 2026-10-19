@@ -278,6 +278,21 @@ requests, or omit it to leave `tsa_token` and `ots_proof` unset.
 generates a new key pair, which changes the node's identity. Each node must have
 its own key file.
 
+`scripts/custody_server_test.py` is the reference host loop. It feeds synthetic
+frames to a builder, calls `close_if_due()` every second, posts each closed
+`(entry, batch)` to a retina-server and prints the server's verdict per window:
+
+```bash
+python scripts/custody_server_test.py --server http://localhost:8000 --window-s 30 --windows 4
+```
+
+A rerun continues the chain in `--state-dir`, after waiting until the window the
+previous run committed on exit has ended, so no time range is signed twice.
+
+Its default node id, `synth-cust-demo-01`, keeps the `synth-` prefix because
+`/api/custody/status` lists only nodes with a public handle, and synthetic ids
+are published as themselves. `--help` lists the other flags.
+
 ## Modules
 
 | Module | Contents |
