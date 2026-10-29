@@ -7,7 +7,7 @@ only runtime dependency) that a RETINA node embeds to make its detection output
 tamper-evident, and that an archive uses to verify what it receives. It was
 extracted from the Tower-Finder backend and packaged on its own.
 
-The design has three parts:
+The design has two parts:
 
 - **Windowed hash chain.** Detection frames are batched per clock-aligned time
   window (15 minutes by default). When a window closes the node hashes the
@@ -17,10 +17,9 @@ The design has three parts:
 - **Node-direct third-party timestamps.** Each entry hash can be submitted by the
   node itself to an RFC 3161 Timestamping Authority (DigiCert) and to
   OpenTimestamps calendar servers. Offworld Labs is not in the trust path.
-- **IQ capture commitments.** A node keeps a short in-RAM circular buffer of raw
-  IQ samples. On request it freezes a window, hashes and signs it, timestamps the
-  hash, and produces a commitment that must be sent before the IQ bytes are
-  uploaded.
+
+A third part, IQ capture commitments, is benched for now. Its code
+stays in the package but is unsupported; see [IQ capture (benched)](#iq-capture-benched).
 
 The package does not include any network transport, server, or archive storage.
 The host process that embeds it is responsible for calling the builder on a timer,
@@ -29,8 +28,8 @@ uploading the `(entry, batch)` pairs it returns, and storing node public keys.
 ## Architecture
 
 The diagram shows the package as it exists today. Solid boxes inside
-`retina_custody` are implemented and tested. Dashed boxes are either placeholders
-or are implemented but not yet wired into any caller.
+`retina_custody` are implemented and tested. Dashed boxes are placeholders. The
+benched IQ capture code is left out.
 
 ```mermaid
 flowchart TB
@@ -56,10 +55,6 @@ flowchart TB
         subgraph persist["chain_dir on disk"]
             log["chain_log.jsonl<br/>append-only, authoritative"]
             state["chain_state.json<br/>last_hash fallback"]
-        end
-        subgraph iq["iq_buffer"]
-            ring["IQCircularBuffer<br/>2 min of IQ in RAM"]
-            cap["IQCaptureManager<br/>freeze → hash → sign → TSA"]
         end
     end
 
@@ -89,13 +84,8 @@ flowchart TB
     store --> verifier
     keys --> verifier
 
-    ring --> cap
-    cap --> crypto
-    cap --> tsa
-    cap -.->|"(IQCapturePackage, iq_bytes)"| uploader
-
     classDef placeholder stroke-dasharray: 5 5
-    class hw,ring,cap placeholder
+    class hw placeholder
 ```
 
 ### What one chain entry commits to
@@ -210,19 +200,15 @@ a failure in one does not block the other.
 
 Requests are made directly from the node with a 15 second timeout.
 
-### IQ capture
+### IQ capture (benched)
 
-`IQCircularBuffer` holds `(timestamp_ms, chunk)` tuples in a deque and evicts
-anything older than its duration (120 s by default). In synthetic mode,
-`start()` launches a thread that appends 1 KiB random chunks once per second for
-protocol testing. Nothing is written to disk.
-
-`IQCaptureManager.capture(window_start_ms, window_end_ms)` freezes the buffer for
-the window, hashes the bytes, signs them, requests a TSA timestamp for the hash,
-and returns an `IQCapturePackage` plus the raw bytes. The intended ordering is
-that the caller sends the package (hash, signature, TSA token) to the server and
-waits for acknowledgment before uploading the IQ data, so the commitment always
-precedes the data.
+Benched on 2026-10-29, with revival planned at a later date. `iq_buffer.py`
+(`IQCircularBuffer`, `IQCaptureManager`) and `IQCapturePackage` stay in the
+package for reference, but are unsupported and must not be wired into a caller.
+They need design changes before they can ship, starting with signing a digest
+rather than the raw IQ bytes, which the ATECC608B requires.
+[docs/iq-capture.md](docs/iq-capture.md) records the protocol, what exists on the
+node and the server, and the work needed to revive it.
 
 ## Usage
 
@@ -286,8 +272,8 @@ its own key file.
 | `retina_custody/crypto_backend.py` | `CryptoBackend` ABC, `SoftwareCryptoBackend` (P-256, key persisted with mode 0600), `HardwareCryptoBackend` placeholder |
 | `retina_custody/hash_chain.py` | `HashChainBuilder` (node) and `HashChainVerifier` (archive) |
 | `retina_custody/tsa_client.py` | `TSAClient`, `OpenTimestampsClient`, `TimestampManager`, RFC 3161 request builder and response check |
-| `retina_custody/iq_buffer.py` | `IQCircularBuffer`, `IQCaptureManager` |
-| `retina_custody/models.py` | `HashChainEntry`, `IQCapturePackage`, `NodeIdentity` dataclasses |
+| `retina_custody/iq_buffer.py` | `IQCircularBuffer`, `IQCaptureManager` (benched) |
+| `retina_custody/models.py` | `HashChainEntry`, `IQCapturePackage` (benched), `NodeIdentity` dataclasses |
 
 Public exports from `retina_custody`: `CryptoBackend`, `SoftwareCryptoBackend`,
 `HashChainBuilder`, `HashChainVerifier`, `HashChainEntry`, `TimestampManager`,
@@ -301,12 +287,14 @@ Public exports from `retina_custody`: `CryptoBackend`, `SoftwareCryptoBackend`,
 - `HardwareCryptoBackend` is a placeholder. It documents the intended ATECC608B
   behaviour (I2C at 0x6A, on-chip key generation and P-256 signing) and raises
   `NotImplementedError`. It will be filled in when Raspberry Pi nodes are deployed.
-- `IQCircularBuffer` and `IQCaptureManager` are implemented but have no caller
-  yet, inside or outside this package, and have no tests.
-- The UNREVIEWED section of `vulture_whitelist.py` lists `HardwareCryptoBackend`,
-  `IQCaptureManager` and its `capture` and `captures`, `IQCircularBuffer.stop`,
-  and three model fields with no reader (`IQCapturePackage.iq_size_bytes`,
-  `NodeIdentity.public_key_fingerprint`, `NodeIdentity.registered_at`).
+- IQ capture (`IQCircularBuffer`, `IQCaptureManager`, `IQCapturePackage`) is
+  benched for now. It has no caller and no tests. See
+  [docs/iq-capture.md](docs/iq-capture.md).
+- The BENCHED section of `vulture_whitelist.py` lists `IQCaptureManager` and its
+  `capture` and `captures`, `IQCircularBuffer.stop`, and
+  `IQCapturePackage.iq_size_bytes`.
+- The UNREVIEWED section lists `HardwareCryptoBackend` and two model fields with
+  no reader (`NodeIdentity.public_key_fingerprint`, `NodeIdentity.registered_at`).
 - The live TSA and OpenTimestamps endpoints are not reachable from CI; the
   clients are tested against a local mock HTTP server.
 
