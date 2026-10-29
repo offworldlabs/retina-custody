@@ -7,7 +7,7 @@ Provides:
   default), the batch is hashed, signed, linked to the previous entry and
   timestamped by third parties. Frames are not individually signed.
 - TSA / OpenTimestamps timestamping
-- IQ circular buffer with server-triggered capture
+- IQ circular buffer with server-triggered capture (benched, see docs/iq-capture.md)
 """
 
 from .canonical import canonicalize

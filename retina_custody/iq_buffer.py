@@ -1,6 +1,10 @@
 """
 IQ circular buffer and server-triggered capture.
 
+BENCHED (2026-10-29): kept for reference, not supported, and not to be wired
+into a caller. It is planned to come back later and needs design changes
+first; see docs/iq-capture.md.
+
 Each node maintains a 2-minute circular buffer of raw IQ samples in RAM.
 No IQ data is written to disk during normal operation.
 

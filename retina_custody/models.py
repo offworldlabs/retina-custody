@@ -38,7 +38,10 @@ class HashChainEntry:
 
 @dataclass
 class IQCapturePackage:
-    """Metadata for a captured IQ sample package."""
+    """Metadata for a captured IQ sample package.
+
+    Benched with iq_buffer.py; see docs/iq-capture.md.
+    """
 
     node_id: str
     capture_id: str
